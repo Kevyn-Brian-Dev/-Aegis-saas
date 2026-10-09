@@ -5,7 +5,7 @@ import Stripe from 'stripe'
  * Only import this in server-side code (Route Handlers, Server Actions).
  */
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-09-30.acacia',
+  apiVersion: '2024-06-20' as any,
   typescript: true,
 })
 
