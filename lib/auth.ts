@@ -48,5 +48,5 @@ export async function hasActiveSubscription(userId: string): Promise<boolean> {
     .eq('id', userId)
     .single()
 
-  return data?.subscription_status === 'active'
+  return !!(data as any)?.status || !!(data as any)?.subscription_status
 }
