@@ -2,11 +2,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { stripe, PRICE_ID, absoluteUrl } from '@/lib/stripe'
 import { createClient } from '@/lib/supabase/server'
 
-/**
- * POST /api/stripe/checkout
- * Creates a Stripe Checkout Session and returns { url }.
- * Body: { userId: string, email: string }
- */
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     const { userId, email } = await request.json() as { userId: string; email: string }
@@ -17,14 +15,13 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient()
 
-    // Fetch or create Stripe customer
-    const { data: profile } = await supabase
+    const { data: profile } = await (supabase as any)
       .from('profiles')
       .select('stripe_customer_id')
       .eq('id', userId)
       .single()
 
-    let customerId = profile?.stripe_customer_id ?? null
+    let customerId = (profile as any)?.stripe_customer_id ?? null
 
     if (!customerId) {
       const customer = await stripe.customers.create({
@@ -33,32 +30,23 @@ export async function POST(request: NextRequest) {
       })
       customerId = customer.id
 
-      // Persist customer ID
-      await supabase
+      await (supabase as any)
         .from('profiles')
         .update({ stripe_customer_id: customerId })
         .eq('id', userId)
     }
 
-    // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      mode: 'subscription',
       line_items: [{ price: PRICE_ID, quantity: 1 }],
-      success_url: absoluteUrl('/checkout/success?session_id={CHECKOUT_SESSION_ID}'),
-      cancel_url:  absoluteUrl('/checkout'),
-      locale: 'pt-BR',
-      allow_promotion_codes: true,
-      subscription_data: {
-        metadata: { supabase_user_id: userId },
-      },
-      metadata: { supabase_user_id: userId },
+      mode: 'subscription',
+      success_url: absoluteUrl('/dashboard?success=true'),
+      cancel_url: absoluteUrl('/checkout?canceled=true'),
     })
 
     return NextResponse.json({ url: session.url })
-  } catch (err) {
-    console.error('[stripe/checkout] Error:', err)
-    const message = err instanceof Error ? err.message : 'Internal server error'
-    return NextResponse.json({ error: message }, { status: 500 })
+  } catch (error: any) {
+    console.error('Checkout error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
